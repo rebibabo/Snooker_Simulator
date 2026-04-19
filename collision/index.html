@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snooker 3D Physics</title>
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <div id="ui">
+    <h3>Strike params</h3>
+
+    <div class="row"><label>a (mm)</label><input type="range" id="pa" min="-22" max="22" step="1" value="0"><span id="va">0</span></div>
+    <div class="row"><label>b (mm)</label><input type="range" id="pb" min="-22" max="22" step="1" value="0"><span id="vb">0</span></div>
+    <div class="row"><label>phi (°)</label><input type="range" id="pp" min="0" max="359" step="1" value="0"><span id="vp">0°</span></div>
+    <div class="row"><label>theta (°)</label><input type="range" id="pt" min="-80" max="80" step="2" value="0"><span id="vt">0°</span></div>
+    <div class="row"><label>force</label><input type="range" id="pf" min="0.05" max="1" step="0.05" value="0.5"><span id="vf">0.50</span></div>
+    <div class="row"><label>μ_tip</label><input type="range" id="pmu" min="0.1" max="1.0" step="0.05" value="0.4"><span id="vmu">0.40</span></div>
+
+    <hr class="divider">
+    <h3 id="adv-physics-header" class="collapsible-header" onclick="toggleAdvPhysics()">
+      <span class="collapse-arrow collapsed">▼</span>
+      <span>Advanced Physics</span>
+    </h3>
+    <div id="adv-physics-content" class="collapsed">
+    
+    <div class="row">
+      <label style="display: flex; align-items: center; gap: 4px;">
+        e_restitu
+        <span class="info-tooltip" title="Cushion bounce coefficient&#10;Higher = more bounce&#10;0.80 = real snooker">?</span>
+      </label>
+      <input type="range" id="padv-er" min="0.5" max="1.0" step="0.05" value="0.80">
+      <span id="vadv-er" style="min-width: 35px;">0.80</span>
+    </div>
+    
+    <div class="row">
+      <label style="display: flex; align-items: center; gap: 4px;">
+        μ_cushion
+        <span class="info-tooltip" title="Cushion friction coefficient&#10;Higher = more friction&#10;Affects spin decay">?</span>
+      </label>
+      <input type="range" id="padv-mc" min="0.2" max="0.8" step="0.05" value="0.40">
+      <span id="vadv-mc" style="min-width: 35px;">0.40</span>
+    </div>
+    
+    <div class="row">
+      <label style="display: flex; align-items: center; gap: 4px;">
+        μ_rolling
+        <span class="info-tooltip" title="Rolling friction coefficient&#10;Higher = faster decay&#10;Affects trajectory length">?</span>
+      </label>
+      <input type="range" id="padv-mr" min="0.005" max="0.05" step="0.005" value="0.020">
+      <span id="vadv-mr" style="min-width: 35px;">0.020</span>
+    </div>
+    
+    <div class="row">
+      <label style="display: flex; align-items: center; gap: 4px;">
+        μ_sliding
+        <span class="info-tooltip" title="Table sliding friction coefficient&#10;Higher = faster velocity decay&#10;Affects ball stop position">?</span>
+      </label>
+      <input type="range" id="padv-ms" min="0.1" max="0.4" step="0.05" value="0.20">
+      <span id="vadv-ms" style="min-width: 35px;">0.20</span>
+    </div>
+    
+    <div class="row">
+      <label style="display: flex; align-items: center; gap: 4px;">
+        e_floor
+        <span class="info-tooltip" title="Table bounce coefficient&#10;Energy ratio when ball bounces&#10;0.5 = standard table">?</span>
+      </label>
+      <input type="range" id="padv-ef" min="0.3" max="0.8" step="0.1" value="0.50">
+      <span id="vadv-ef" style="min-width: 35px;">0.50</span>
+    </div>
+    </div>
+
+    <hr class="divider">
+    <div id="presets">
+      <button class="preset-btn" onclick="applyPreset(0,0,0,0,0.5)">Center</button>
+      <button class="preset-btn" onclick="applyPreset(0,8,0,0,0.5)">Topspin</button>
+      <button class="preset-btn" onclick="applyPreset(0,-8,0,0,0.5)">Backspin</button>
+      <button class="preset-btn" onclick="applyPreset(8,0,0,0,0.5)">Right</button>
+      <button class="preset-btn" onclick="applyPreset(-8,0,0,0,0.5)">Left</button>
+      <button class="preset-btn" onclick="applyPreset(0,0,0,15,0.7)">Jump</button>
+      <button class="preset-btn" onclick="applyPreset(0,-8,0,-5,0.9)">Power back</button>
+      <button class="preset-btn" onclick="applyPreset(9,8,0,-40,0.4)">Masse</button>
+      <button class="preset-btn" onclick="applyPreset(22,0,0,0,0.8)">Miscue</button>
+    </div>
+
+    <hr class="divider">
+    <div id="btns" style="margin-bottom:6px;">
+      <button id="btn-trail" class="on" onclick="toggleTrail()">Trail on</button>
+      <button id="btn-cam" onclick="toggleCam()">Free</button>
+      <button id="btn-play" onclick="togglePlay()">Pause</button>
+    </div>
+    <button id="sim-btn" onclick="simulate()">▶ Simulate</button>
+    <button id="reset-btn" style="width: 100%; background: rgba(100,100,100,0.15); border-color: #666; color: #888; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase; margin-top: 6px;" onclick="resetBallPosition()">Reset Ball</button>
+    
+    <hr class="divider">
+    <h3 style="font-size: 12px; color: #5a7a5a;">Multi-Trace</h3>
+    <div style="font-size: 10px; color: #4a6a4a; margin-bottom: 8px;">
+      <div class="row"><label>Param</label>
+        <select id="mt-param" style="flex:1;">
+          <option value="force">force</option>
+          <option value="a">a (mm)</option>
+          <option value="b">b (mm)</option>
+          <option value="phi">phi (°)</option>
+          <option value="theta">theta (°)</option>
+        </select>
+      </div>
+      <div class="row"><label>From</label><input type="number" id="mt-from" value="0.5" style="flex:1; padding: 4px; font-size: 11px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+      <div class="row"><label>To</label><input type="number" id="mt-to" value="1.0" style="flex:1; padding: 4px; font-size: 11px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+      <div class="row"><label>Step</label><input type="number" id="mt-step" value="0.1" style="flex:1; padding: 4px; font-size: 11px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+    </div>
+    <button id="mt-btn" onclick="multiTrace()" style="width: 100%; background: rgba(200,168,74,0.1); border-color: #c8a84a; color: #c8a84a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">Multi-Trace</button>
+  </div>
+
+  <div id="hud">
+    <div class="hud-row"><span class="hud-label">pos x</span><span class="hud-val" id="hx">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">pos y</span><span class="hud-val" id="hy">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">speed</span><span class="hud-val" id="hspd">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">omega</span><span class="hud-val" id="hom">0.0</span></div>
+    <div class="hud-row"><span class="hud-label">t</span><span class="hud-val" id="ht">0.000s</span></div>
+    <div class="state-label" id="hstate">READY</div>
+  </div>
+
+  <div id="info">drag — orbit &nbsp;|&nbsp; scroll — zoom &nbsp;|&nbsp; right-drag — pan &nbsp;|&nbsp; <span style="color: #a8de8f;">M+drag — adjust ball</span></div>
+  
+  <div id="minimap">
+    <canvas id="minimap-canvas"></canvas>
+  </div>
+  
+  <div id="warning" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    background: rgba(255, 100, 100, 0.9); border: 2px solid #ff4444; border-radius: 8px; 
+    padding: 20px 40px; font-size: 24px; color: #fff; text-align: center; z-index: 1000;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snooker 3D Physics</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #080a08; color: #e0e0e0; font-family: 'Courier New', monospace; overflow: hidden; }
+#app { width: 100vw; height: 100vh; position: relative; }
+canvas { width: 100%; height: 100%; display: block; }
+
+#ui {
+  position: absolute; top: 16px; left: 16px; width: 280px;
+  background: rgba(8,10,8,0.88); border: 1px solid #2a3a2a;
+  border-radius: 8px; padding: 14px; backdrop-filter: blur(6px);
+}
+#ui h3 {
+  font-size: 10px; letter-spacing: 3px; color: #5a7a5a;
+  margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #1a2a1a; padding-bottom: 8px;
+}
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.row label { font-size: 10px; color: #5a6a5a; width: 62px; flex-shrink: 0; letter-spacing: 1px; }
+.row input[type=range] {
+  flex: 1; -webkit-appearance: none; height: 2px;
+  background: #1e2e1e; border-radius: 1px; outline: none; cursor: pointer;
+}
+.row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 11px; height: 11px;
+  border-radius: 50%; background: #c8a84a; cursor: pointer;
+  box-shadow: 0 0 4px rgba(200,168,74,0.4);
+}
+.row span { font-size: 10px; color: #c8a84a; width: 40px; text-align: right; letter-spacing: 1px; }
+
+.divider { border: none; border-top: 1px solid #1a2a1a; margin: 10px 0; }
+
+#presets { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.preset-btn {
+  background: transparent; border: 1px solid #2a3a2a; color: #5a7a5a;
+  font-size: 9px; letter-spacing: 1px; padding: 4px 7px; border-radius: 3px;
+  cursor: pointer; font-family: monospace; text-transform: uppercase; transition: all 0.15s;
+}
+.preset-btn:hover { border-color: #c8a84a; color: #c8a84a; }
+
+#btns { display: flex; gap: 6px; }
+button {
+  flex: 1; background: transparent; border: 1px solid #2a3a2a; color: #5a7a5a;
+  font-size: 9px; letter-spacing: 1px; padding: 7px 4px; border-radius: 4px;
+  cursor: pointer; font-family: monospace; text-transform: uppercase; transition: all 0.15s;
+}
+button:hover { border-color: #c8a84a; color: #c8a84a; }
+button.on { border-color: #c8a84a; color: #c8a84a; background: rgba(200,168,74,0.06); }
+
+#sim-btn {
+  background: rgba(200,168,74,0.1); border-color: #c8a84a; color: #c8a84a;
+  font-size: 10px; letter-spacing: 2px; padding: 8px;
+}
+#sim-btn:hover { background: rgba(200,168,74,0.2); }
+
+#hud {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(8,10,8,0.75); border: 1px solid #2a3a2a;
+  border-radius: 6px; padding: 10px 14px; font-size: 10px; letter-spacing: 1px;
+  min-width: 160px;
+}
+#hud .hud-row { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 4px; }
+#hud .hud-label { color: #4a6a4a; }
+#hud .hud-val { color: #c8a84a; }
+#hud .state-label {
+  font-size: 11px; letter-spacing: 3px; color: #c8a84a;
+  border-top: 1px solid #1a2a1a; margin-top: 6px; padding-top: 6px; text-align: center;
+}
+
+#info {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: #2a4a2a; letter-spacing: 2px; text-align: center;
+  pointer-events: none; text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <div id="ui">
+    <h3>Strike params</h3>
+
+    <div class="row"><label>a (mm)</label><input type="range" id="pa" min="-22" max="22" step="1" value="0"><span id="va">0</span></div>
+    <div class="row"><label>b (mm)</label><input type="range" id="pb" min="-22" max="22" step="1" value="0"><span id="vb">0</span></div>
+    <div class="row"><label>phi (°)</label><input type="range" id="pp" min="0" max="359" step="1" value="0"><span id="vp">0°</span></div>
+    <div class="row"><label>theta (°)</label><input type="range" id="pt" min="-80" max="80" step="2" value="0"><span id="vt">0°</span></div>
+    <div class="row"><label>force</label><input type="range" id="pf" min="0.05" max="1" step="0.05" value="0.5"><span id="vf">0.50</span></div>
+    <div class="row"><label>μ_tip</label><input type="range" id="pmu" min="0.1" max="1.0" step="0.05" value="0.4"><span id="vmu">0.40</span></div>
+
+    <hr class="divider">
+    <div id="presets">
+      <button class="preset-btn" onclick="applyPreset(0,0,0,0,0.5)">Center</button>
+      <button class="preset-btn" onclick="applyPreset(0,8,0,0,0.5)">Topspin</button>
+      <button class="preset-btn" onclick="applyPreset(0,-8,0,0,0.5)">Backspin</button>
+      <button class="preset-btn" onclick="applyPreset(8,0,0,0,0.5)">Right</button>
+      <button class="preset-btn" onclick="applyPreset(-8,0,0,0,0.5)">Left</button>
+      <button class="preset-btn" onclick="applyPreset(0,0,0,15,0.7)">Jump</button>
+      <button class="preset-btn" onclick="applyPreset(0,-8,0,-5,0.9)">Power back</button>
+      <button class="preset-btn" onclick="applyPreset(9,8,0,-40,0.4)">Masse</button>
+      <button class="preset-btn" onclick="applyPreset(22,0,0,0,0.8)">Miscue</button>
+    </div>
+
+    <hr class="divider">
+    <div id="btns" style="margin-bottom:6px;">
+      <button id="btn-trail" class="on" onclick="toggleTrail()">Trail on</button>
+      <button id="btn-cam" onclick="toggleCam()">Free</button>
+      <button id="btn-play" onclick="togglePlay()">Pause</button>
+    </div>
+    <button id="sim-btn" onclick="simulate()">▶ Simulate</button>
+    
+    <hr class="divider">
+    <h3 style="font-size: 9px; color: #5a7a5a;">Multi-Trace</h3>
+    <div style="font-size: 8px; color: #4a6a4a; margin-bottom: 8px;">
+      <div class="row"><label>Parameter</label>
+        <select id="mt-param" style="flex:1; padding: 4px; font-size: 9px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a; border-radius: 3px;">
+          <option value="force">force</option>
+          <option value="a">a (mm)</option>
+          <option value="b">b (mm)</option>
+          <option value="phi">phi (°)</option>
+          <option value="theta">theta (°)</option>
+        </select>
+      </div>
+      <div class="row"><label>From</label><input type="number" id="mt-from" value="0.5" style="flex:1; padding: 4px; font-size: 9px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+      <div class="row"><label>To</label><input type="number" id="mt-to" value="1.0" style="flex:1; padding: 4px; font-size: 9px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+      <div class="row"><label>Step</label><input type="number" id="mt-step" value="0.1" style="flex:1; padding: 4px; font-size: 9px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
+    </div>
+    <button id="mt-btn" onclick="multiTrace()" style="width: 100%; background: rgba(200,168,74,0.1); border-color: #c8a84a; color: #c8a84a; font-size: 9px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">Multi-Trace</button>
+  </div>
+
+  <div id="hud">
+    <div class="hud-row"><span class="hud-label">pos x</span><span class="hud-val" id="hx">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">pos y</span><span class="hud-val" id="hy">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">speed</span><span class="hud-val" id="hspd">0.000</span></div>
+    <div class="hud-row"><span class="hud-label">omega</span><span class="hud-val" id="hom">0.0</span></div>
+    <div class="hud-row"><span class="hud-label">t</span><span class="hud-val" id="ht">0.000s</span></div>
+    <div class="state-label" id="hstate">READY</div>
+  </div>
+
+  <div id="info">drag — orbit &nbsp;|&nbsp; scroll — zoom &nbsp;|&nbsp; right-drag — pan</div>
+  
+  <div id="warning" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    background: rgba(255, 100, 100, 0.9); border: 2px solid #ff4444; border-radius: 8px; 
+    padding: 20px 40px; font-size: 24px; color: #fff; text-align: center; z-index: 1000;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── Physics constants ───────────────────────────────────────────────
+const BALL_MASS=0.1406, BALL_RADIUS=0.02625, MAX_FORCE_N=0.5;
+const MU_SLIDING=0.20, MU_ROLLING=0.015, G=9.81;
+const INERTIA=2/5*BALL_MASS*BALL_RADIUS**2;
+const DT=1/240, SLIP_THRESH=0.05, V_STOP=1e-4, W_STOP=0.01;
+const E_FLOOR=0.5, VZ_JUMP_THRESH=0.6, LOW_CUE_THRESH=0.3, MU_TIP=0.60, E_TABLE=0.5;
+const MAX_STEPS=240*20;
+
+// ── Vector math ─────────────────────────────────────────────────────
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm=a=>Math.sqrt(dot(a,a));
+const scale=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const normalize=a=>{const n=norm(a);return n<1e-12?[0,0,0]:scale(a,1/n);};
+
+// ── API Server connection ───────────────────────────────────────────
+const API_URL = 'http://localhost:8000/simulate';
+
+// 从 Python API 获取轨迹数据
+async function requestSimulation(a, b, phi, theta, force, mu_tip) {
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b, phi, theta, force, mu_tip })
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    
+    if (!data.success) throw new Error(data.error || 'Simulation failed');
+    
+    // 转换 API 返回的帧数据格式，同时保存完整数据
+    const frames = data.frames.map(f => ({
+      pos: f.pos,
+      v: f.v,
+      omega: f.omega,
+      state: f.state,
+      t: f.t
+    }));
+    
+    // 将完整数据附加到 frames 对象上
+    frames._data = data;
+    return frames;
+    
+  } catch (error) {
+    console.error('❌ Simulation error:', error.message);
+    alert(`Simulation failed: ${error.message}\n\nMake sure to run: python simulator_server.py`);
+    return [];
+  }
+}
+
+// ── Three.js scene ──────────────────────────────────────────────────
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060806);
+// 移除雾效应以保持固定的球颜色
+// scene.fog=new THREE.FogExp2(0x060806,0.008);
+
+const camera=new THREE.PerspectiveCamera(55,1,0.001,300);
+camera.position.set(0,0.25,0.5);
+camera.lookAt(0,0,0);
+
+// Table surface — infinite plane
+const tableGeo=new THREE.PlaneGeometry(100,100);
+const tableMat=new THREE.MeshBasicMaterial({color:0x1a7a3a});
+const tableMesh=new THREE.Mesh(tableGeo,tableMat);
+tableMesh.rotation.x=-Math.PI/2;
+tableMesh.receiveShadow=true;
+scene.add(tableMesh);
+
+// Grid lines on table
+for(let z=-250;z<=250;z+=0.5){
+  const pts=[new THREE.Vector3(-250,0.001,z),new THREE.Vector3(250,0.001,z)];
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x0a2010,transparent:true,opacity:0.6})));
+}
+for(let x=-250;x<=250;x+=0.2){
+  const pts=[new THREE.Vector3(x,0.001,-250),new THREE.Vector3(x,0.001,250)];
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x0a2010,transparent:true,opacity:0.4})));
+}
+
+// Ball
+const ballGeo=new THREE.SphereGeometry(BALL_RADIUS,48,48);
+const ballMat=new THREE.MeshPhongMaterial({color:0xf5f0e8,shininess:180,specular:0xffffff});
+const ballMesh=new THREE.Mesh(ballGeo,ballMat);
+ballMesh.castShadow=true;
+scene.add(ballMesh);
+
+// Ball marker dots (6 cardinal points + 2 equator)
+const dotMat=new THREE.MeshPhongMaterial({color:0xcc1111,shininess:100});
+const dotGeo=new THREE.SphereGeometry(BALL_RADIUS*0.13,8,8);
+const markerDirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],[0.707,0.707,0],[-0.707,0.707,0]];
+markerDirs.forEach(d=>{
+  const dot=new THREE.Mesh(dotGeo,dotMat);
+  const n=Math.sqrt(d[0]**2+d[1]**2+d[2]**2);
+  dot.position.set(d[0]/n*BALL_RADIUS*0.93,d[1]/n*BALL_RADIUS*0.93,d[2]/n*BALL_RADIUS*0.93);
+  ballMesh.add(dot);
+});
+
+// Ball glow ring (shows position on table)
+const ringGeo=new THREE.RingGeometry(BALL_RADIUS*1.2,BALL_RADIUS*1.5,32);
+const ringMat=new THREE.MeshBasicMaterial({color:0xc8a84a,side:THREE.DoubleSide,transparent:true,opacity:0.25});
+const ring=new THREE.Mesh(ringGeo,ringMat);
+ring.rotation.x=-Math.PI/2;
+ring.position.y=0.001;
+scene.add(ring);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x334433,0.8));
+const sun=new THREE.DirectionalLight(0xfff8e0,1.2);
+sun.position.set(3,8,2); sun.castShadow=true;
+sun.shadow.mapSize.width=2048; sun.shadow.mapSize.height=2048;
+sun.shadow.camera.near=0.1; sun.shadow.camera.far=50;
+sun.shadow.camera.left=-5; sun.shadow.camera.right=5;
+sun.shadow.camera.top=5; sun.shadow.camera.bottom=-5;
+scene.add(sun);
+const fill=new THREE.DirectionalLight(0x334488,0.3);
+fill.position.set(-2,3,-2); scene.add(fill);
+const ballLight=new THREE.PointLight(0xfff8e0,0.6,1.0);
+scene.add(ballLight);
+
+// Trail
+let trailPoints=[], trailLine=null, trailLines=[], showTrail=true;
+
+function rebuildTrail(frames){
+  if(trailLine){scene.remove(trailLine);trailLine=null;}
+  if(!showTrail||frames.length<2) return;
+  
+  const pts=frames.map(f=>new THREE.Vector3(f.pos[1], f.pos[2], -f.pos[0]));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const tubeGeo=new THREE.TubeGeometry(curve, pts.length, 0.002, 4, false);
+  const tubeMat=new THREE.MeshPhongMaterial({color:0xffffff, transparent:true, opacity:0.8});
+  trailLine=new THREE.Mesh(tubeGeo, tubeMat);
+  scene.add(trailLine);
+}
+
+function clearMultiTrails(){
+  trailLines.forEach(line => scene.remove(line));
+  trailLines=[];
+}
+
+function addTrailLine(frames, color, opacity=0.6){
+  if(frames.length<2) return;
+  const pts=frames.map(f=>new THREE.Vector3(f.pos[1], f.pos[2], -f.pos[0]));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const tubeGeo=new THREE.TubeGeometry(curve, pts.length, 0.002, 4, false);
+  const tubeMat=new THREE.MeshPhongMaterial({color, transparent:true, opacity});
+  const mesh=new THREE.Mesh(tubeGeo, tubeMat);
+  scene.add(mesh);
+  trailLines.push(mesh);
+}
+
+async function multiTrace(){
+  const param = document.getElementById('mt-param').value;
+  const from = parseFloat(document.getElementById('mt-from').value);
+  const to = parseFloat(document.getElementById('mt-to').value);
+  const step = parseFloat(document.getElementById('mt-step').value);
+  
+  clearMultiTrails();
+  if(trailLine){scene.remove(trailLine);trailLine=null;}
+  
+  const values=[];
+  for(let v=from; v<=to+step*0.01; v+=step) values.push(parseFloat(v.toFixed(6)));
+  
+  document.getElementById('mt-btn').textContent='🔄 Computing...';
+  document.getElementById('mt-btn').disabled=true;
+  
+  let count=0;
+  for(const val of values){
+    let a=parseFloat(document.getElementById('pa').value);
+    let b=parseFloat(document.getElementById('pb').value);
+    let phi=parseFloat(document.getElementById('pp').value);
+    let theta=parseFloat(document.getElementById('pt').value);
+    let force=parseFloat(document.getElementById('pf').value);
+    let mu_tip=parseFloat(document.getElementById('pmu').value);
+    
+    if(param==='force') force=val;
+    else if(param==='a') a=val;
+    else if(param==='b') b=val;
+    else if(param==='phi') phi=val;
+    else if(param==='theta') theta=val;
+    
+    const trace=await requestSimulation(a,b,phi,theta,force,mu_tip);
+    if(trace.length>0){
+      const hue=(count/(values.length-1 || 1))*0.7;
+      const color=new THREE.Color().setHSL(hue, 0.7, 0.6);
+      addTrailLine(trace, color.getHex(), 0.7);
+      count++;
+    }
+  }
+  
+  document.getElementById('mt-btn').textContent='Multi-Trace';
+  document.getElementById('mt-btn').disabled=false;
+}
+
+// State
+let frames=[], playIdx=0, playing=false, followCam=false;
+let isDragging=false, isRightDrag=false, lastMx=0, lastMy=0;
+let orbitTheta=0.0, orbitPhi=1.1, orbitR=0.45;
+let panX=0, panZ=0;
+const ballQuat=new THREE.Quaternion();
+const tmpQ=new THREE.Quaternion(), tmpAxis=new THREE.Vector3();
+
+async function simulate(){
+  clearMultiTrails();
+  
+  const a=parseFloat(document.getElementById('pa').value);
+  const b=parseFloat(document.getElementById('pb').value);
+  const phi=parseFloat(document.getElementById('pp').value);
+  const theta=parseFloat(document.getElementById('pt').value);
+  const force=parseFloat(document.getElementById('pf').value);
+  const mu_tip=parseFloat(document.getElementById('pmu').value);
+  
+  document.getElementById('sim-btn').textContent='⏳ Computing...';
+  document.getElementById('sim-btn').disabled=true;
+  
+  frames = await requestSimulation(a, b, phi, theta, force, mu_tip);
+  
+  document.getElementById('sim-btn').textContent='▶ Simulate';
+  document.getElementById('sim-btn').disabled=false;
+  
+  // 检查是否呲杆
+  if (frames._data && frames._data.initial_state && frames._data.initial_state.miscue) {
+    showWarning('⚠️ MISCUE!', 2000);
+  }
+  
+  if (frames.length > 0) {
+    rebuildTrail(frames);
+    ballQuat.identity();
+    ballMesh.quaternion.copy(ballQuat);
+    playIdx=0; 
+    playing=true;
+    document.getElementById('btn-play').textContent='Pause';
+    
+    // 如果启用 Follow 模式，立即初始化摄像机位置（不要 lerp）
+    if(followCam) {
+      const f=frames[0];
+      const tx=f.pos[1], ty=f.pos[2], tz=-f.pos[0];
+      const ox=Math.sin(orbitPhi)*Math.sin(orbitTheta)*orbitR;
+      const oy=Math.cos(orbitPhi)*orbitR+0.01;
+      const oz=Math.sin(orbitPhi)*Math.cos(orbitTheta)*orbitR;
+      const baseHeight=0.0;
+      camPos.set(tx+ox+panX, baseHeight+oy, tz+oz+panZ);
+    }
+  }
+}
+
+function applyPreset(a,b,phi,theta,force){
+  document.getElementById('pa').value=a; document.getElementById('va').textContent=a;
+  document.getElementById('pb').value=b; document.getElementById('vb').textContent=b;
+  document.getElementById('pp').value=phi; document.getElementById('vp').textContent=phi+'°';
+  document.getElementById('pt').value=theta; document.getElementById('vt').textContent=theta+'°';
+  document.getElementById('pf').value=force; document.getElementById('vf').textContent=force.toFixed(2);
+  simulate();
+}
+
+function toggleTrail(){
+  showTrail=!showTrail;
+  document.getElementById('btn-trail').textContent=showTrail?'Trail on':'Trail off';
+  document.getElementById('btn-trail').className=showTrail?'on':'';
+  rebuildTrail(frames);
+  trailLines.forEach(line => line.visible = showTrail);
+}
+function toggleCam(){
+  followCam=!followCam;
+  document.getElementById('btn-cam').textContent=followCam?'Follow':'Free';
+  document.getElementById('btn-cam').className=followCam?'on':'';
+}
+function togglePlay(){
+  playing=!playing;
+  if(playing&&playIdx>=frames.length-1){playIdx=0;ballQuat.identity();}
+  document.getElementById('btn-play').textContent=playing?'Pause':'Play';
+}
+
+// 显示警告通知
+function showWarning(msg, duration=2000) {
+  const warningEl = document.getElementById('warning');
+  warningEl.textContent = msg;
+  warningEl.style.opacity = '1';
+  setTimeout(() => {
+    warningEl.style.opacity = '0';
+  }, duration);
+}
+
+// Sliders
+[['pa','va',''],['pb','vb',''],['pp','vp','°'],['pt','vt','°'],['pf','vf','f'],['pmu','vmu','f']].forEach(([id,vid,unit])=>{
+  document.getElementById(id).addEventListener('input',function(){
+    let v=parseFloat(this.value);
+    
+    // theta 特殊处理：0 值磁性吸附（范围 ±0.5）
+    if(id==='pt' && Math.abs(v) < 0.5) {
+      v = 0;
+      this.value = 0;
+    }
+    
+    const el=document.getElementById(vid);
+    if(unit==='f') el.textContent=v.toFixed(2);
+    else if(unit==='°') el.textContent=v+'°';
+    else el.textContent=v;
+  });
+  
+  // theta 滑块添加 change 事件（鼠标释放时）来处理微小偏移
+  if(id==='pt') {
+    document.getElementById(id).addEventListener('change',function(){
+      let v=parseFloat(this.value);
+      // 如果非常接近整数，自动对齐
+      const nearest = Math.round(v);
+      if(Math.abs(v - nearest) < 0.01) {
+        this.value = nearest;
+        document.getElementById('vt').textContent = nearest + '°';
+      }
+    });
+  }
+});
+
+// Mouse orbit
+const app=document.getElementById('app');
+app.addEventListener('mousedown',e=>{
+  // 防止在 UI 和滑块上拖动时启用轨道旋转
+  if(e.target.closest('#ui')) return;
+  isDragging=true; isRightDrag=e.button===2;
+  lastMx=e.clientX; lastMy=e.clientY;
+});
+app.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('mouseup',()=>isDragging=false);
+window.addEventListener('mousemove',e=>{
+  if(!isDragging) return;
+  const dx=e.clientX-lastMx, dy=e.clientY-lastMy;
+  if(isRightDrag){
+    panX+=dx*0.001*orbitR; panZ+=dy*0.001*orbitR;
+  } else {
+    orbitTheta-=dx*0.006;
+    orbitPhi=Math.max(0.05,Math.min(Math.PI/2-0.02,orbitPhi-dy*0.005));
+  }
+  lastMx=e.clientX; lastMy=e.clientY;
+});
+app.addEventListener('wheel',e=>{
+  orbitR=Math.max(0.04,Math.min(8,orbitR*Math.pow(1.001,e.deltaY)));
+},{passive:true});
+
+// Resize
+function resize(){
+  const w=window.innerWidth,h=window.innerHeight;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+resize(); window.addEventListener('resize',resize);
+
+// HUD update
+function updateHUD(f){
+  if(!f) return;
+  document.getElementById('hx').textContent=f.pos[0].toFixed(3)+'m';
+  document.getElementById('hy').textContent=f.pos[1].toFixed(3)+'m';
+  const spd=Math.sqrt(f.v[0]**2+f.v[1]**2);
+  document.getElementById('hspd').textContent=spd.toFixed(3)+'m/s';
+  const om=Math.sqrt(f.omega[0]**2+f.omega[1]**2+f.omega[2]**2);
+  document.getElementById('hom').textContent=om.toFixed(1)+' r/s';
+  document.getElementById('ht').textContent=f.t.toFixed(3)+'s';
+  document.getElementById('hstate').textContent=f.state.toUpperCase();
+}
+
+// ── Render loop ─────────────────────────────────────────────────────
+const clock=new THREE.Clock();
+const camTarget=new THREE.Vector3();
+const camPos=new THREE.Vector3(0,0.25,0.5);
+const lookTarget=new THREE.Vector3();
+
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=clock.getDelta();
+
+  if(playing&&frames.length>0){
+    const realDT=Math.min(dt,0.05);
+    const stepsPerFrame=Math.max(1,Math.round(realDT/DT));
+    for(let s=0;s<stepsPerFrame&&playIdx<frames.length-1;s++){
+      const f=frames[playIdx];
+      const om=f.omega;
+      const omSpd=Math.sqrt(om[0]**2+om[1]**2+om[2]**2);
+      if(omSpd>1e-6){
+        // Coordinate mapping: table [x,y,z] → THREE [-y, z, -x]
+        tmpAxis.set(om[1], om[2], -om[0]).normalize();
+        tmpQ.setFromAxisAngle(tmpAxis, omSpd*DT);
+        ballQuat.premultiply(tmpQ);
+        ballMesh.quaternion.copy(ballQuat);
+      }
+      playIdx++;
+    }
+    if(playIdx>=frames.length-1){playing=false;document.getElementById('btn-play').textContent='Play';}
+  }
+
+  const fi=Math.min(playIdx, frames.length-1);
+  if(frames.length>0){
+    const f=frames[fi];
+    // Map table coords to Three.js: table x → -Three z, table y → -Three x, table z → Three y
+    const tx=f.pos[1], ty=f.pos[2], tz=-f.pos[0];
+    ballMesh.position.set(tx,ty,tz);
+    ring.position.set(tx,0.001,tz);
+    ballLight.position.set(tx,ty+0.15,tz);
+    updateHUD(f);
+
+    if(followCam){
+      const ox=Math.sin(orbitPhi)*Math.sin(orbitTheta)*orbitR;
+      const oy=Math.cos(orbitPhi)*orbitR+0.01;
+      const oz=Math.sin(orbitPhi)*Math.cos(orbitTheta)*orbitR;
+      const baseHeight=0.0;  // 摄像机基准高度固定，不跟球高度变化
+      camTarget.set(tx+ox+panX, baseHeight+oy, tz+oz+panZ);
+      lookTarget.set(tx+panX, baseHeight, tz+panZ);
+      camPos.lerp(camTarget,0.18);
+      camera.position.copy(camPos);
+      camera.lookAt(lookTarget);
+    } else {
+      const cx=Math.sin(orbitPhi)*Math.sin(orbitTheta)*orbitR+panX;
+      const cy=Math.cos(orbitPhi)*orbitR;
+      const cz=Math.sin(orbitPhi)*Math.cos(orbitTheta)*orbitR+panZ;
+      camera.position.lerp(new THREE.Vector3(cx,cy,cz),0.1);
+      camera.lookAt(panX,0,panZ);
+    }
+    sun.target.position.copy(ballMesh.position);
+    sun.target.updateMatrixWorld();
+  }
+
+  renderer.render(scene,camera);
+}
+
+// 初始化
+loop();
+document.getElementById('sim-btn').textContent='▶ Simulate';
+
+</script>
+</body>
+</html>
