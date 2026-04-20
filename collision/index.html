@@ -13,13 +13,20 @@
   <canvas id="c"></canvas>
 
   <div id="ui">
-    <h3>Strike params</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Strike params</h3>
+      <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+        <span id="ui-toggle-label" style="font-size: 12px; color: #5a7a5a; letter-spacing: 1px; text-transform: uppercase;">Hide</span>
+        <button id="ui-collapse-btn" onclick="toggleUIPanel()" style="background: none; border: none; color: #5a7a5a; font-size: 22px; cursor: pointer; padding: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transition: all 0.3s; margin-top: -6px;">◄</button>
+      </div>
+    </div>
+    <div id="ui-content" style="transition: all 0.3s ease;">
 
-    <div class="row"><label>a (mm)</label><input type="range" id="pa" min="-22" max="22" step="1" value="0"><span id="va">0</span></div>
-    <div class="row"><label>b (mm)</label><input type="range" id="pb" min="-22" max="22" step="1" value="0"><span id="vb">0</span></div>
-    <div class="row"><label>phi (°)</label><input type="range" id="pp" min="0" max="359" step="1" value="0"><span id="vp">0°</span></div>
-    <div class="row"><label>theta (°)</label><input type="range" id="pt" min="-80" max="80" step="2" value="0"><span id="vt">0°</span></div>
-    <div class="row"><label>force</label><input type="range" id="pf" min="0.05" max="1" step="0.05" value="0.5"><span id="vf">0.50</span></div>
+    <div class="row"><label>a (mm)</label><input type="range" id="pa" min="-22" max="22" step="0.1" value="0"><span id="va">0</span></div>
+    <div class="row"><label>b (mm)</label><input type="range" id="pb" min="-22" max="22" step="0.1" value="0"><span id="vb">0</span></div>
+    <div class="row"><label>phi (°)</label><input type="range" id="pp" min="0" max="359" step="0.1" value="0"><span id="vp">0°</span></div>
+    <div class="row"><label>theta (°)</label><input type="range" id="pt" min="-85" max="0" step="0.1" value="0"><span id="vt">0°</span></div>
+    <div class="row"><label>force</label><input type="range" id="pf" min="0.05" max="1" step="0.01" value="0.5"><span id="vf">0.50</span></div>
     <div class="row"><label>μ_tip</label><input type="range" id="pmu" min="0.1" max="1.0" step="0.05" value="0.4"><span id="vmu">0.40</span></div>
 
     <hr class="divider">
@@ -30,7 +37,7 @@
     <div id="adv-physics-content" class="collapsed">
     
     <div class="row">
-      <label style="display: flex; align-items: center; gap: 4px;">
+      <label style="display: flex; align-items: center; gap: 4px; width: 80px; flex-shrink: 0;">
         e_restitu
         <span class="info-tooltip" title="Cushion bounce coefficient&#10;Higher = more bounce&#10;0.80 = real snooker">?</span>
       </label>
@@ -39,7 +46,7 @@
     </div>
     
     <div class="row">
-      <label style="display: flex; align-items: center; gap: 4px;">
+      <label style="display: flex; align-items: center; gap: 4px; width: 80px; flex-shrink: 0;">
         μ_cushion
         <span class="info-tooltip" title="Cushion friction coefficient&#10;Higher = more friction&#10;Affects spin decay">?</span>
       </label>
@@ -48,7 +55,7 @@
     </div>
     
     <div class="row">
-      <label style="display: flex; align-items: center; gap: 4px;">
+      <label style="display: flex; align-items: center; gap: 4px; width: 80px; flex-shrink: 0;">
         μ_rolling
         <span class="info-tooltip" title="Rolling friction coefficient&#10;Higher = faster decay&#10;Affects trajectory length">?</span>
       </label>
@@ -57,7 +64,7 @@
     </div>
     
     <div class="row">
-      <label style="display: flex; align-items: center; gap: 4px;">
+      <label style="display: flex; align-items: center; gap: 4px; width: 80px; flex-shrink: 0;">
         μ_sliding
         <span class="info-tooltip" title="Table sliding friction coefficient&#10;Higher = faster velocity decay&#10;Affects ball stop position">?</span>
       </label>
@@ -66,7 +73,7 @@
     </div>
     
     <div class="row">
-      <label style="display: flex; align-items: center; gap: 4px;">
+      <label style="display: flex; align-items: center; gap: 4px; width: 80px; flex-shrink: 0;">
         e_floor
         <span class="info-tooltip" title="Table bounce coefficient&#10;Energy ratio when ball bounces&#10;0.5 = standard table">?</span>
       </label>
@@ -94,12 +101,26 @@
       <button id="btn-cam" onclick="toggleCam()">Free</button>
       <button id="btn-play" onclick="togglePlay()">Pause</button>
     </div>
-    <button id="sim-btn" onclick="simulate()">▶ Simulate</button>
+    <div style="display: flex; gap: 6px;">
+      <button id="sim-btn" onclick="simulate()" style="flex: 1;">▶ Simulate</button>
+      <button id="strike-mode-btn" onclick="toggleStrikeMode()" style="flex: 1; background: rgba(100,150,100,0.15); border-color: #6a8a6a; color: #8aaa8a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">⚙ Strike Mode</button>
+    </div>
+    <div style="display: flex; gap: 6px; margin-top: 6px;">
+      <button id="undo-btn" onclick="undoState()" style="flex: 1; background: rgba(100,150,100,0.15); border-color: #6a8a6a; color: #8aaa8a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;" title="Ctrl+Z">↶ Undo</button>
+      <button id="redo-btn" onclick="redoState()" style="flex: 1; background: rgba(100,150,100,0.15); border-color: #6a8a6a; color: #8aaa8a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;" title="Ctrl+Shift+Z">↷ Redo</button>
+    </div>
+    <div style="display: flex; gap: 6px; margin-top: 6px;">
+      <button id="save-btn" onclick="saveState()" style="flex: 1; background: rgba(100,150,100,0.15); border-color: #6a8a6a; color: #8aaa8a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">💾 Save</button>
+      <button id="history-btn" onclick="showHistory()" style="flex: 1; background: rgba(100,150,100,0.15); border-color: #6a8a6a; color: #8aaa8a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">📋 History</button>
+    </div>
     <button id="reset-btn" style="width: 100%; background: rgba(100,100,100,0.15); border-color: #666; color: #888; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase; margin-top: 6px;" onclick="resetBallPosition()">Reset Ball</button>
     
     <hr class="divider">
-    <h3 style="font-size: 12px; color: #5a7a5a;">Multi-Trace</h3>
-    <div style="font-size: 10px; color: #4a6a4a; margin-bottom: 8px;">
+    <h3 id="mt-header" class="collapsible-header" onclick="toggleMultiTrace()" style="font-size: 12px; color: #5a7a5a;">
+      <span class="collapse-arrow collapsed">▼</span>
+      <span>Multi-Trace</span>
+    </h3>
+    <div id="mt-content" class="collapsed" style="font-size: 10px; color: #4a6a4a; margin-bottom: 8px;">
       <div class="row"><label>Param</label>
         <select id="mt-param" style="flex:1;">
           <option value="force">force</option>
@@ -114,6 +135,7 @@
       <div class="row"><label>Step</label><input type="number" id="mt-step" value="0.1" style="flex:1; padding: 4px; font-size: 11px; background: #1e2e1e; color: #c8a84a; border: 1px solid #2a3a2a;"></div>
     </div>
     <button id="mt-btn" onclick="multiTrace()" style="width: 100%; background: rgba(200,168,74,0.1); border-color: #c8a84a; color: #c8a84a; font-size: 11px; letter-spacing: 1px; padding: 6px; border-radius: 4px; cursor: pointer; border: 1px solid #2a3a2a; text-transform: uppercase;">Multi-Trace</button>
+    </div>
   </div>
 
   <div id="hud">
@@ -127,7 +149,7 @@
 
   <div id="info">drag — orbit &nbsp;|&nbsp; scroll — zoom &nbsp;|&nbsp; right-drag — pan &nbsp;|&nbsp; <span style="color: #a8de8f;">M+drag — adjust ball</span></div>
   
-  <div id="minimap">
+  <div id="minimap" onclick="openMinimapWindow()" style="cursor: pointer;">
     <canvas id="minimap-canvas"></canvas>
   </div>
   
@@ -135,9 +157,90 @@
     background: rgba(255, 100, 100, 0.9); border: 2px solid #ff4444; border-radius: 8px; 
     padding: 20px 40px; font-size: 24px; color: #fff; text-align: center; z-index: 1000;
     pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+  
+  <!-- 绿色成功提示 -->
+  <div id="success" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    background: rgba(100, 200, 100, 0.9); border: 2px solid #4a8a4a; border-radius: 8px; 
+    padding: 20px 40px; font-size: 24px; color: #fff; text-align: center; z-index: 1000;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s;"></div>
+  
+  <!-- 自定义输入对话框（保存状态） -->
+  <div id="input-dialog" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0, 0, 0, 0.5); display: none; z-index: 3000; justify-content: center; align-items: center;">
+    <div style="background: #222; border: 2px solid #666; border-radius: 10px; padding: 25px; 
+      max-width: 400px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.8);">
+      <div id="input-title" style="font-size: 18px; margin-bottom: 15px; color: #aaa;">Enter save name</div>
+      <input id="input-field" type="text" style="width: 100%; padding: 8px; margin-bottom: 15px; 
+        background: #333; border: 1px solid #666; border-radius: 4px; color: #fff; font-size: 14px; box-sizing: border-box;">
+      <div style="display: flex; gap: 10px;">
+        <button id="input-ok" style="flex: 1; padding: 8px; background: #4a8a4a; border: 1px solid #6aaa6a; 
+          border-radius: 4px; color: #fff; cursor: pointer;">OK</button>
+        <button id="input-cancel" style="flex: 1; padding: 8px; background: #555; border: 1px solid #777; 
+          border-radius: 4px; color: #fff; cursor: pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 自定义选择对话框（加载状态） -->
+  <div id="select-dialog" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0, 0, 0, 0.5); display: none; z-index: 2000; justify-content: center; align-items: center;">
+    <div style="background: #222; border: 2px solid #666; border-radius: 10px; padding: 25px; 
+      max-width: 500px; max-height: 500px; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.8);">
+      <div style="font-size: 18px; margin-bottom: 15px; color: #aaa; text-align: center;">Select a save to load</div>
+      <div id="select-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      <div style="display: flex; justify-content: center; margin-top: 15px;">
+        <button id="select-cancel" style="padding: 8px 20px; background: #555; border: 1px solid #777; 
+          border-radius: 4px; color: #fff; cursor: pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 确认删除对话框 -->
+  <div id="confirm-dialog" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0, 0, 0, 0.5); display: none; z-index: 3000; justify-content: center; align-items: center;">
+    <div style="background: #222; border: 2px solid #666; border-radius: 10px; padding: 25px; 
+      max-width: 400px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.8);">
+      <div id="confirm-title" style="font-size: 18px; margin-bottom: 20px; color: #aaa;">Confirm delete?</div>
+      <div style="display: flex; gap: 10px;">
+        <button id="confirm-yes" style="flex: 1; padding: 8px; background: #8a4a4a; border: 1px solid #aa6a6a; 
+          border-radius: 4px; color: #fff; cursor: pointer;">Delete</button>
+        <button id="confirm-no" style="flex: 1; padding: 8px; background: #555; border: 1px solid #777; 
+          border-radius: 4px; color: #fff; cursor: pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 放大Minimap窗口 -->
+  <div id="minimap-expanded" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0, 0, 0, 0.8); display: none; z-index: 2500; justify-content: center; align-items: center;">
+    <div style="position: relative; background: rgba(8,10,8,0.95); border: none; border-radius: 8px; 
+      padding: 16px; width: 70%; aspect-ratio: 160 / 240; max-width: 640px; max-height: 960px; box-shadow: 0 4px 20px rgba(0,0,0,0.9);">
+      <button id="minimap-close-btn" onclick="closeMinimapWindow()" style="position: absolute; top: 16px; right: 16px; 
+        background: none; border: 1px solid #666; border-radius: 4px; color: #aaa; padding: 4px 8px; cursor: pointer; 
+        font-size: 14px; letter-spacing: 1px; text-transform: uppercase; transition: all 0.2s; z-index: 10;">Close</button>
+      <canvas id="minimap-expanded-canvas" style="width: 100%; height: 100%; display: block; border: 1px solid #2a3a2a; border-radius: 4px;"></canvas>
+    </div>
+  </div>
+  
+  <!-- 力度条（Strike 模式下显示） -->
+  <div id="power-container" style="display: none;">
+    <div id="power-bar"></div>
+  </div>
+  
+  <!-- 母球示意图（Strike 模式下显示） -->
+  <div id="white-ball-guide" style="position: fixed; right: 10px; top: 50%; transform: translateY(calc(-50% - 150px)); 
+    width: 60px; height: 60px; display: none; z-index: 99;">
+    <canvas id="white-ball-canvas" width="60" height="60" style="width: 100%; height: 100%; display: block;"></canvas>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="audio.js"></script>
+<script src="keyboard.js"></script>
+<script src="api.js"></script>
+<script src="minimap.js"></script>
+<script src="ui.js"></script>
+<script src="history.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

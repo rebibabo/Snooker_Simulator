@@ -5,18 +5,35 @@ canvas { width: 100%; height: 100%; display: block; }
 
 #ui {
   position: absolute; top: 16px; left: 16px; width: 320px;
+  max-height: calc(100vh - 32px);
   background: rgba(8,10,8,0.88); border: 1px solid #2a3a2a;
   border-radius: 8px; padding: 14px; backdrop-filter: blur(6px);
-  overflow: visible; z-index: 100;
+  overflow: hidden; z-index: 100;
+  display: flex; flex-direction: column;
 }
 #ui h3 {
   font-size: 12px; letter-spacing: 3px; color: #5a7a5a;
   margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #1a2a1a; padding-bottom: 8px;
 }
+#ui-content {
+  flex: 1; overflow-y: auto; padding-right: 4px; min-height: 0;
+}
+#ui-content::-webkit-scrollbar {
+  width: 6px;
+}
+#ui-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+#ui-content::-webkit-scrollbar-thumb {
+  background: #3a4a3a; border-radius: 3px; transition: all 0.2s;
+}
+#ui-content::-webkit-scrollbar-thumb:hover {
+  background: #5a7a5a;
+}
 .row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.row label { font-size: 12px; color: #5a6a5a; width: 62px; flex-shrink: 0; letter-spacing: 1px; }
+.row label { font-size: 12px; color: #5a6a5a; width: 80px; flex-shrink: 0; letter-spacing: 1px; }
 .row input[type=range] {
-  flex: 1; -webkit-appearance: none; height: 2px;
+  flex: 0.8; -webkit-appearance: none; height: 2px;
   background: #1e2e1e; border-radius: 1px; outline: none; cursor: pointer;
 }
 .row input[type=range]::-webkit-slider-thumb {
@@ -24,7 +41,7 @@ canvas { width: 100%; height: 100%; display: block; }
   border-radius: 50%; background: #c8a84a; cursor: pointer;
   box-shadow: 0 0 4px rgba(200,168,74,0.4);
 }
-.row span { font-size: 12px; color: #c8a84a; width: 40px; text-align: right; letter-spacing: 1px; }
+.row span { font-size: 12px; color: #c8a84a; width: 50px; text-align: right; letter-spacing: 1px; }
 
 .divider {
   border: none; border-top: 1px solid #1a2a1a; margin: 14px 0 16px 0;
@@ -37,7 +54,7 @@ canvas { width: 100%; height: 100%; display: block; }
   display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
 }
 .collapse-arrow {
-  display: inline-block; font-size: 10px; color: #c8a84a; transition: transform 0.2s;
+  display: inline-block; font-size: 14px; font-weight: bold; color: #c8a84a; transition: transform 0.2s; margin-right: 4px; margin-top: -4px;
 }
 .collapse-arrow.collapsed {
   transform: rotate(-90deg);
@@ -46,6 +63,13 @@ canvas { width: 100%; height: 100%; display: block; }
   max-height: 500px; overflow: hidden; transition: max-height 0.3s ease;
 }
 #adv-physics-content.collapsed {
+  max-height: 0; margin-bottom: 0;
+}
+
+#mt-content {
+  max-height: 500px; overflow: hidden; transition: max-height 0.3s ease;
+}
+#mt-content.collapsed {
   max-height: 0; margin-bottom: 0;
 }
 
@@ -128,9 +152,20 @@ button.on { border-color: #c8a84a; color: #c8a84a; background: rgba(200,168,74,0
   border: 1px solid #2a3a2a; border-radius: 4px;
   background: rgba(8,10,8,0.9);
   width: 200px; height: 280px;
+  cursor: pointer;
 }
 
 #minimap canvas { display: block; width: 100%; height: 100%; }
+
+#minimap-close-btn:hover {
+  border-color: #c8a84a;
+  color: #c8a84a;
+  background: rgba(200,168,74,0.1);
+}
+
+#minimap-close-btn:active {
+  background: rgba(200,168,74,0.2);
+}
 
 /* Tooltip styles */
 .info-tooltip {
@@ -153,4 +188,68 @@ button.on { border-color: #c8a84a; color: #c8a84a; background: rgba(200,168,74,0
 }
 .info-tooltip:hover::before {
   opacity: 1;
+}
+
+/* UI Panel collapse style */
+#ui.collapsed #ui-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+}/* 力度条（Strike 模式） */
+#power-container {
+  position: fixed;
+  right: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 200px;
+  background: rgba(20, 30, 20, 0.8);  /* 深色背景 */
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(100, 150, 100, 0.6);
+  z-index: 99;
+}
+
+/* 刻度线伪元素 - 显示在前面 */
+#power-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 8px;
+  z-index: 10;
+  
+  /* 刻度线 */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 9px,
+    rgba(170, 176, 170, 0.8) 10px,
+    rgba(170, 176, 170, 0.8) 10px
+  );
+}
+
+#power-bar {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  
+  /* 渐变（下→上） */
+  background: linear-gradient(
+    to top,
+    #00ff88 0%,   /* 绿色（弱） */
+    #ffee00 50%,  /* 黄色（中） */
+    #ff3b3b 100%  /* 红色（强） */
+  );
+  
+  background-size: 100% 200px;  /* 渐变恰好填满力度条容器的最大高度 */
+  background-position: 0 bottom;  /* 从底部开始对齐 */
+  background-repeat: no-repeat;
+  
+  transition: height 0.05s linear;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.4);  /* 内阴影增加立体感 */
 }

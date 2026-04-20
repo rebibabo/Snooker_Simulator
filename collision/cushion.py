@@ -121,8 +121,10 @@ def compute_cushion_impulse(
     is_new_contact = not state.in_contact
     state.in_contact = True
 
-    # 如果球在离开接触（vn >= 0），重置 already_resolved 标记
-    if vn >= 0:
+    # 如果球法向速度不足以引起碰撞（即沿库边运动），忽略
+    # 这避免了"贴着库边沿方向打球"被误识别为碰库的问题
+    COLLISION_THRESHOLD = 0.01  # m/s，只有超过此值的朝库边速度才算碰撞
+    if vn > -COLLISION_THRESHOLD:
         state.already_resolved = False
         return v.copy(), omega.copy(), state
 
@@ -139,62 +141,37 @@ def compute_cushion_impulse(
     state.already_resolved = True
 
     # ── ③ 接触点速度 ──────────────────────────────────────────────
+    # ★ 库边只处理 2D 摩擦（x-y 平面），不处理 z 方向 ★
     r_c       = BALL_RADIUS * (-n_hat)   # 球心→接触点
     v_contact = v + np.cross(omega, r_c)
 
-    vc_t  = np.dot(v_contact, t_hat)
-    vc_z  = np.dot(v_contact, z_hat)
+    vc_t  = np.dot(v_contact, t_hat)  # 切向速度
 
-    # rolling 约束下 ω 和 v 耦合（wy=vx/R, wx=-vy/R），
-    # 这部分旋转对接触点的 z 贡献会被台面底部支撑力抵消，
-    # 只有"超出 rolling 约束"的旋转分量才真正产生 vz 效应。
-    # 计算 rolling 旋转对 vc_z 的贡献并扣除：
-    # 只有超出 rolling 约束的旋转分量才对 vz 产生贡献：
-    # rolling 状态：wy = vx/R，此时 vc_z = 0（接触点在球心高度无相对运动）
-    # 超出部分：omega_excess = omega - omega_rolling
-    # 注意：sliding 球 omega < omega_rolling，excess 为负（缺旋转），不产生 vz
-    omega_rolling = np.array([-v[1]/BALL_RADIUS, v[0]/BALL_RADIUS, 0.])
-    omega_excess  = omega - omega_rolling
-    vc_z_excess   = np.dot(np.cross(omega_excess, r_c), z_hat)
-    # sliding 球：omega=0, omega_excess 方向和 rolling 旋转反向
-    # 这种情况下接触点 z 速度应该为 0（没有额外旋转），不产生 vz
-    # 只有 omega_excess 和 omega_rolling 方向相同（即超旋转）才取
-    # 简化：检查实际 vc_z 和 rolling vc_z 的符号
-    # 若 omega 比 omega_rolling 更大（超旋转），产生 vz；否则 vz_excess=0
-    vc_z_rolling_val = np.dot(np.cross(omega_rolling, r_c), z_hat)
-    vc_z_actual      = np.dot(np.cross(omega, r_c), z_hat)
-    # excess 只取实际旋转超出 rolling 的部分（同号且绝对值更大）
-    if abs(vc_z_actual) > abs(vc_z_rolling_val) and \
-       np.sign(vc_z_actual) == np.sign(vc_z_rolling_val):
-        vc_z_excess = vc_z_actual - vc_z_rolling_val
-    else:
-        vc_z_excess = 0.0
-
-    v_slip = np.sqrt(vc_t**2 + vc_z_excess**2)
+    v_slip = abs(vc_t)  # 只考虑切向滑动速度
 
     # ── ④ 法向冲量 ────────────────────────────────────────────────
     Jn = -(1 + E_RESTITUTION) * BALL_MASS * vn   # >0，朝台内
 
     # ── ⑤ 切向冲量（库仑摩擦）────────────────────────────────────
+    # ★ 只处理 2D 摩擦 ★
     F_limit = MU_CUSHION * abs(Jn)
 
     if v_slip < 1e-9:
-        Jt, Jz = 0.0, 0.0
+        Jt = 0.0
     else:
         # 粘滞：让接触点切向速度归零
-        Jt_stick = -vc_t        / CUSHION_DENOM
-        Jz_stick = -vc_z_excess / CUSHION_DENOM
-        J_stick  = np.sqrt(Jt_stick**2 + Jz_stick**2)
+        Jt_stick = -vc_t / CUSHION_DENOM
+        J_stick  = abs(Jt_stick)
 
         if J_stick <= F_limit:
-            Jt, Jz = Jt_stick, Jz_stick
+            Jt = Jt_stick
         else:
-            # 滑动：截断到库仑极限
-            Jt = -F_limit * vc_t        / v_slip
-            Jz = -F_limit * vc_z_excess / v_slip
+            # 滑动：截断到库仑极限（用接触点速度 vc_t）
+            Jt = -F_limit * vc_t / v_slip
 
     # ── ⑥ 更新速度和角速度 ────────────────────────────────────────
-    J_total   = Jn * n_hat + Jt * t_hat + Jz * z_hat
+    # ★ 只包含法向和切向冲量（2D 摩擦）★
+    J_total   = Jn * n_hat + Jt * t_hat
     v_new     = v     + J_total / BALL_MASS
     omega_new = omega + np.cross(r_c, J_total) / INERTIA
 

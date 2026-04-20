@@ -24,7 +24,7 @@ sleep 2
 
 # 通过 HTTP 打开浏览器访问（支持音频文件加载）
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    open http://localhost:8000/index.html
+    open -a "Microsoft Edge" http://localhost:8000/index.html
 fi
 
 echo "✅ API: http://localhost:8000"

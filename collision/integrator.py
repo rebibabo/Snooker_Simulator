@@ -222,6 +222,9 @@ def step_single_ball(ball: BallEntity, dt: float,
                            'ball': ball.ball_id, 'pos': pos[:2].copy()})
         else:
             v, omega = v_new, omega_new
+        
+        # 在 sliding 状态也需要衰减 ω.z
+        omega[2] = wz_rolling_decay(omega[2], dt)
 
     elif state == 'rolling':
         spd = np.linalg.norm(v[:2])
@@ -292,14 +295,26 @@ def resolve_ball_collisions(
             # 记录碰撞前速度，判断是否发生了实际碰撞
             v_a_before = ball_a.v.copy()
             
-            # ★ 计算碰撞前的相对速度 ★
+            # ★ 计算接触点相对速度（包含旋转效应，更准确的碰撞强度指示） ★
             pos_diff = ball_b.pos - ball_a.pos
             dist = np.linalg.norm(pos_diff)
             if dist > 1e-9:
                 n_hat = pos_diff / dist  # 法向（从 a 指向 b）
-                v_rel = ball_b.v - ball_a.v  # 相对速度
-                v_rel_n = np.dot(v_rel, n_hat)  # 法向相对速度
-                rel_velocity = abs(v_rel_n)  # ★ 用绝对值记录碰撞强度（无论靠近还是分离）
+                
+                # 接触点位置（沿法向距离为R处）
+                r_c_a = BALL_RADIUS * n_hat    # a的接触点
+                r_c_b = -BALL_RADIUS * n_hat   # b的接触点
+                
+                # 接触点速度 = 球心速度 + 旋转速度
+                v_contact_a = ball_a.v + np.cross(ball_a.omega, r_c_a)
+                v_contact_b = ball_b.v + np.cross(ball_b.omega, r_c_b)
+                
+                # 相对接触点速度
+                v_contact_rel = v_contact_b - v_contact_a
+                
+                # 接触点法向相对速度（更准确的碰撞强度指示，考虑旋转效应）
+                vc_rel_n = np.dot(v_contact_rel, n_hat)
+                rel_velocity = abs(vc_rel_n)  # ★ 用接触点速度记录碰撞强度
             else:
                 rel_velocity = 0
 
@@ -371,10 +386,11 @@ def integrate_multi(
     events: list = []
     t = 0.0
     frame_count = 0
+    last_event_count = 0  # 追踪上一帧的事件数量
 
     def snapshot():
         """记录所有球当前状态"""
-        nonlocal frame_count
+        nonlocal frame_count, last_event_count
         balls_snap = {}
         for b in balls:
             balls_snap[b.ball_id] = {
@@ -388,12 +404,37 @@ def integrate_multi(
 
         if verbose and frame_count % 20 == 0:
             info = []
+            # 检查本帧是否有碰库或球碰事件
+            frame_events = events[last_event_count:]
+            last_event_count = len(events)
+            
+            cushion_hits = [e for e in frame_events if e['type'] == 'cushion_hit']
+            ball_collisions = [e for e in frame_events if e['type'] == 'ball_collision']
+            
             for b in balls:
                 if not b.stopped:
-                    info.append(f"{b.ball_id}:[{b.pos[0]:6.3f},{b.pos[1]:6.3f}] "
-                                f"|v|={np.linalg.norm(b.v[:2]):.3f} {b.state[:4]}")
+                    # 检查该球是否在本帧有碰库or球碰事件
+                    b_cushion_hit = any(e['ball'] == b.ball_id for e in cushion_hits)
+                    b_ball_collision = any(b.ball_id in e.get('balls', ()) for e in ball_collisions)
+                    
+                    marker_parts = []
+                    if b_cushion_hit:
+                        marker_parts.append('碰库')
+                    if b_ball_collision:
+                        marker_parts.append('碰球')
+                    marker = f" *** {'+'.join(marker_parts)} ***" if marker_parts else ''
+                    
+                    v_spd = np.linalg.norm(b.v[:2])
+                    info.append(
+                        f"{b.ball_id}: pos=[{b.pos[0]:7.4f},{b.pos[1]:7.4f},{b.pos[2]:6.4f}]  "
+                        f"v=[{b.v[0]:7.3f},{b.v[1]:7.3f},{b.v[2]:6.3f}]  "
+                        f"ω=[{b.omega[0]:7.2f},{b.omega[1]:7.2f},{b.omega[2]:7.2f}]  "
+                        f"state={b.state}{marker}"
+                    )
             if info:
-                print(f"[{frame_count:4d}] t={t:.3f}s  " + "  ".join(info))
+                print(f"[{frame_count:4d}] t={t:.3f}s", end=' ')
+                for line in info:
+                    print(f"  {line}")
 
     snapshot()
 
